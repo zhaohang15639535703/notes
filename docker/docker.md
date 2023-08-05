@@ -337,7 +337,7 @@ Union文件系统(UnionFS)是一种分层，轻量级并且高性能的文件系
 
 
 
-![img](./../../CodeSpace/chainmaker/medicine_trace/chain/contract/rust/medicine_trace/docker.assets/image-20230701160507847.png)
+
 
 
 
@@ -472,7 +472,7 @@ docker拉去某些软件可能会出一些问题，比如mysql字符集配置
 
 ```bash
 $ docker pull mysql:8.0.20
-$ docker run -d -p 3306:3306 --privileged=true -v /root/mysql/log:/var/log/mysql -v /root/mysql/data:/var/lib/mysql -v /root/mysql/conf:/etc/mysql/conf.d -e MYSQL_ROOT_PASSWORD=Chainmaker010818 --name mysql mysql:8.0.20
+$ docker run -d -p 3306:3306 --privileged=true -v /root/mysql/log:/var/log/mysql -v /root/mysql/data:/var/lib/mysql -v /root/mysql/conf:/etc/mysql/conf.d -e MYSQL_ROOT_PASSWORD=123456 --name mysql mysql:8.0.20
 $ cd /root/mysql/conf
 $ touch my.cnf
 $ vim my.cnf
@@ -952,8 +952,6 @@ docker网络能干什么:
 
 
 
-![img](./../../CodeSpace/chainmaker/medicine_trace/chain/contract/rust/medicine_trace/docker.assets/image-20230702203704760.png)
-
 
 
 网桥docker0创建一对对等虚拟设备接口,一个叫veth，另一个叫eth0，成对匹配
@@ -1145,7 +1143,7 @@ services:
       - "3306:3306"
     volumes:
       - /app/mysql/db:/var/lib/mysql
-      - /app/mysql/conf/my.cnf:/etc/my.cnf
+      - /app/mysql/conf/my.cnf:/etc/mysql/conf.d/my.cnf
       - /app/mysql/init:/docker-entrypoint-initdb.d
     networks:
       - atguigu_net
