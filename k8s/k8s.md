@@ -130,6 +130,8 @@ node: 4核 8G 40G
 
 #### 1.5.1 kubeadm方式搭建
 
+https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+
 ```bash
 # 设置服务器hostname
 $ hostnamectl set-hostname <hostname>
@@ -169,7 +171,7 @@ $ kubectl get pod,svc
 
 1. 安装3台虚拟机，安装操作系统
 2. 对三个安装之后的操作系统进行初始化操作
-3. 在三个节点安装docker kubelet,kubeadm kubectl
+3. 在三个节点安装docker kubelet,kubeadm kubectl,更改docker源
 4. 在master节点执行kubeadm init命令进行初始化
 5. 在node节点上执行kubeadm join命令把node节点添加到当前集群里面
 
@@ -205,3 +207,273 @@ kubectl是Kubernetes集群的命令行工具,通过kubectl能够对集群本身�
 $ kubectl [command] [type] [name] [flags]
 $ kubectl --help
 ```
+
+### 1.7 yaml文件说明
+
+#### 1.7.1 文件书写格式
+
+- 通过缩进表示层级关系
+
+- 不能用tab键表示缩进
+
+- : 后加一个空格
+
+- 一般开头缩进两个空格
+
+- 字符后缩进一个空格
+
+- --- 表示一个新的yaml文件的开始
+
+- 使用#代表注释
+
+  
+
+#### 1.7.2 yaml文件示例
+
+![image-20230807211133244](./k8s.assets/image-20230807211133244.png)
+
+| 字段       | 说明       |
+| ---------- | ---------- |
+| apiVersion | Api版本    |
+| kind       | 资源类型   |
+| metadata   | 资源元数据 |
+| spec       | 资源规格   |
+| replicas   | 副本数量   |
+| selector   | 标签选择器 |
+| template   | Pod模板    |
+| metadata   | Pod元数据  |
+| spec       | Pod规格    |
+| container  | 容器配置   |
+
+#### 1.7.3 如何快速编写yaml文件 
+
+1. 使用**kubectl create**命令生成yaml文件
+
+```bash
+$ kubectl create deployment web --image=nginx -o yaml --dry-run > web1.yaml
+```
+
+   
+
+## 2.Kubernetes核心技术
+
+### 2.1 Pod
+
+#### 2.1.1 Pod概述
+
+1. Pod是k8s系统中可以创建(部署)和管理的最小单元
+
+2. k8s不会直接处理容器,而是Pod,Pod可以包含多个容器(一组容器的集合)
+
+3. 一个pod中共享网络命名空间
+4. 每一个Pod都有一个特殊的被称为"根容器"的Pause容器。Pause容器对应的镜像属于k8s平台的一部分,除了Pause容器,每个Pod还包含一个或者多个紧密相关的用户业务容器。
+5. Pod是短暂的
+
+#### 2.1.2 Pod存在的意义
+
+1. 创建容器使用docker，一个docker对应一个容器，一个容器有进程，一个容器运行一个应用程序
+2. Pod是多进程设计，可以运行多个应用程序；一个Pod有多个容器，一个容器里面运行一个应用程序
+3. Pod存在是为了亲密性交互: 
+   - 两个应用之间进行交互
+   - 网络之间进行调用
+   - 两个应用需要频繁调用
+
+#### 2.1.3 Pod实现机制
+
+1. 共享网络
+
+容器本身是相互隔离的，k8s利用Pod的Pause容器(info容器)，吧其他业务容器加入到Pause容器中，让所有业务容器在同一个名称空间中，可以实现网络共享
+
+
+
+2. 共享存储
+
+Pod持久化数据：日志数据，业务数据
+
+使用Volume数据卷进行持久化存储
+
+
+
+![image-20230807213750692](./k8s.assets/image-20230807213750692.png)
+
+#### 2.1.4 Pod镜像拉取策略
+
+![image-20230807214310677](./k8s.assets/image-20230807214310677.png)
+
+**imagePullPolicy**
+
+IfNotPresent: 默认值，镜像在宿主机上不存在时才拉取
+
+Always: 每次创建Pod都会拉取一次镜像
+
+Never: Pod永远不会主动拉取这个镜像,需要手动拉取
+
+
+
+#### 2.1.5 Pod资源限制
+
+![image-20230807214650036](./k8s.assets/image-20230807214650036.png)
+
+
+
+![image-20230807214752888](./k8s.assets/image-20230807214752888.png)
+
+1c = 1000m(1核cpu)
+
+#### 2.1.7 Pod重启机制
+
+![image-20230807214939269](./k8s.assets/image-20230807214939269.png)
+
+**restartPolicy**
+
+Always: 当容器终止推出后，总是重启容器，默认策略
+
+OnFailure: 当容器异常退出(退出状态码非0)时才重启容器
+
+Never: 当容器终止推出时，从不重启容器
+
+#### 2.1.8 Pod健康检查
+
+容器检查：
+
+检测不出java堆内存溢出(状态还是running)
+
+
+
+应用层面健康检查：
+
+![image-20230807215420620](./k8s.assets/image-20230807215420620.png)
+
+echo $?表示linux上一条命令是否执行成功
+
+
+
+#### 2.1.9 创建Pod流程
+
+![image-20230807230142401](./k8s.assets/image-20230807230142401.png)
+
+- master节点
+
+createpod -- apiserver -- etcd 
+
+scheducler -- apiserver --etcd -- 调度算法,吧pod调度到某个node节点上
+
+- node节点
+
+kubelet --apiserver --读取etcd拿到分配给当前节点pod --docker创建容器
+
+
+
+**影响调度的属性**
+
+1. pod资源限制: resources
+
+2. 节点选择器标签影响Pod调度
+
+![image-20230807230744324](./k8s.assets/image-20230807230744324.png)
+
+![image-20230807230836133](./k8s.assets/image-20230807230836133.png)
+
+需要先对节点打标签
+
+```bash
+$ kubectl label node k8snode1 env_role=prod
+$ kubectl get nodes k8snode1 --show-labels
+```
+
+3. 节点亲和性影响Pod调度
+
+![image-20230807231246458](./k8s.assets/image-20230807231246458.png)
+
+**节点亲和性** nodeAffinity和之前nodeSelector基本一样的,根据节点上标签约束来决定Pod调度到哪些节点上
+
+(1) 硬亲和性(requireDuringSchedulingIgnoreDuringExecution)
+
+约束条件必须满足
+
+(2) 软亲和性(preferredDuringSchedulingIgnoredDuringExecution)
+
+尝试满足，不保证
+
+
+
+常用的操作符(operator):
+
+In NotIn Exists Gt Lt DoesNotExists
+
+
+
+**反亲和性**:使用NotIn和DoesNotExists
+
+
+
+4. 污点和污点容忍
+
+
+
+- 基本介绍：
+
+nodeSelector和nodeAffinity: Pod调度到某些节点上,Pod属性,调度的时候实现
+
+Taint污点: 节点不做普通分配调度,是节点属性
+
+
+
+- 场景
+
+专用节点
+
+配置特点硬件节点
+
+基于Taint驱逐
+
+```bash
+# 查看当前节点的污点情况
+$ kubectl describe node k8smaster | grep Taint
+```
+
+污点值有三个:
+
+NoSchedule: 一定不被调度
+
+PreferNoSchedule: 尽量不被调度
+
+NoExecute: 不会调度,而且还会驱逐Node已有Pod
+
+
+
+为节点添加污点
+
+kubectl taint node [node] key=value:污点三个值
+
+```bash
+$ kubectl get pods
+$ kubectl create deployment web --image=nginx
+$ kubectl get pods -o wide
+# 再创建4个
+$ kubectl scale deployment web --replicas=5
+$ kubectl taint node [node] key=value
+# 删除pod
+$ kubectl delete deployment web
+$ kubectl get pods
+No resources found in default namespace
+$ kubectl taint node k8snode1 env_role=yes:NoSchedule
+$ kubectl describe node k8snode1 | grep Taint
+
+```
+
+删除污点
+
+```bash
+$ kubectl taint node k8snode1 env_role:NoSchedule-
+$ kubectl describe node k8snode1 | grep Taint
+```
+
+
+
+污点容忍:
+
+![image-20230807234403228](./k8s.assets/image-20230807234403228.png)
+
+
+
