@@ -477,3 +477,189 @@ $ kubectl describe node k8snode1 | grep Taint
 
 
 
+### 2.2 Controller
+
+#### 2.2.1 什么是Controller
+
+在集群上管理和运行容器的对象
+
+#### 2.1.2 Pod和Controller关系
+
+- Pod通过Controller实现应用的运维，比如伸缩，滚动升级等
+
+  - Pod 和Controller之间通过label标签建立关系
+
+  ![image-20230808234119571](./k8s.assets/image-20230808234119571.png)
+
+![image-20230808232857068](./k8s.assets/image-20230808232857068.png)
+
+#### 2.1.3 deployment应用场景
+
+- 部署无状态应用
+- 管理Pod和ReplicaSet
+- 部署，滚动升级等功能
+
+应用场景: web服务,微服务
+
+#### 2.1.4 使用deployment部署应用(yaml)
+
+```bash
+# 导出yaml文件
+$ kubectl create deployment web --image=nginx --dry-run -o yaml > web.yaml
+# 使用yaml部署y
+$ kubectl apply -f web.yaml
+$ kubectl get nodes
+# 对外发布,暴露端口
+$ kubectl expose deployment web --port=80 --type=NodePort --target-port=80 --name=web1 -o yaml > web1.yaml
+$ kubectl apply -f web1.yaml
+$ kubectl get nodes -o wide
+```
+
+#### 2.1.5 应用升级回滚和弹性伸缩
+
+```bash
+# 应用升级
+$ kubectl set image deployment web nginx=nginx:1.15
+# 查看升级状态
+$ kubectl rollout status deployment web
+# 查看历史版本
+$ kubectl rollout history deployment web
+# 还原到上一个版本
+$ kubectl rollout undo deployment web
+# 弹性伸缩
+$ kubectl scale deployment web --replicas=10
+```
+
+#### 2.1.6 无状态和有状态的区别
+
+1. 无状态
+   - 认为Pod都是一样的(副本都是一样的)
+   - 没有顺序要求
+   - 不用考虑在哪个node运行
+   - 随意进行伸缩和扩展
+2. 有状态
+   - 上面因素都需要考虑到
+   - 让每个pod独立，保持pod启动顺序和唯一性(唯一的网络标识符，持久存储，有序，比如mysql主从)
+
+
+
+#### 2.1.7 部署有状态的应用
+
+- 无头service: 
+  - ClusterIP: node
+
+**StatefulSet**部署有状态应用
+
+![image-20230811230353736](./k8s.assets/image-20230811230353736.png)
+
+![image-20230811230406752](./k8s.assets/image-20230811230406752.png)
+
+执行后查看pod，有3个Pod，每个都是唯一的名称
+
+查看svc, ClusterIP为None
+
+
+
+deployment和statefulset区别:有身份的(唯一标识的)
+
+- 根据主机名+按照一定规则生成域名
+- 唯一域名
+
+格式： 主机名称.service名称.名称空间.svc.cluster.local
+
+example: nginx-statefulset-0.nignx.default.svc
+
+#### 2.1.8 部署守护进程DaemonSet
+
+- 在每个node上运行一个pod，新加入的node也同样运行在一个Pod里面
+- 例子：在每个node节点安装数据采集工具
+
+![image-20230811231134348](./k8s.assets/image-20230811231134348.png)
+
+```bash
+$ kubectl delete statefulset --all
+$ kubectl delete svc nginx
+$ kubectl delete svc web
+$ kubectl apply -f ds.yaml
+$ kubectl exec -it ds-test-cbk6cv bash
+```
+
+#### 2.1.9 job(一次性任务)和cronjob(定时任务)
+
+![image-20230811231545974](./k8s.assets/image-20230811231545974.png)
+
+
+
+```bash
+$ kubectl create -f job.yaml
+$ kubectl get pods -o wide
+$ kubectl get jobs
+pi-qpqff Completed
+$ kubectl logs pi-qpqff
+# 删除
+$ kubectl delete -f job.yaml
+```
+
+ 
+
+
+
+定时任务:
+
+![image-20230811232040797](./k8s.assets/image-20230811232040797.png)
+
+```bash
+$ kubectl apply -f cronjob.yaml
+$ kubectl get pods
+$ kubectl get cronjobs
+$ kubectl logs hello-1599100140-wkn79
+```
+
+每次执行状态bian'wei
+
+
+
+
+
+### 2.3 Service
+
+#### 2.3.1 Service 是什么
+
+定义一组Pod的访问规则
+
+#### 2.3.2 Service存在意义
+
+- 防止Pod失联(服务发现)
+
+  ![image-20230811222421895](./k8s.assets/image-20230811222421895.png)
+
+- 定义一组Pod访问策略(负载均衡)
+
+![image-20230811222533358](./k8s.assets/image-20230811222533358.png)
+
+#### 2.3.4 Pod和Service的关系
+
+根据label标签建立关系
+
+![image-20230811224608990](./k8s.assets/image-20230811224608990.png)
+
+#### 2.3.5 常用Service类型
+
+1. ClusterIP: 集群内部使用
+2. NodePort: 对外访问应用使用
+3. LoadBalancer: 对外访问应用使用,公有云
+
+```bash
+$ kubectl get svc
+$ kubectl expose deployment web --port=80 --target-port=80 --dry-run -o yaml > service1.yaml
+$ kubectl apply -f service1.yaml
+$ kubectl get svc
+```
+
+node 内网部署应用,外网一般不能访问到:
+
+用一台可以进行外网访问的机器，安装nginx,反向代理
+
+手动把可以访问节点添加到nginx
+
+LoadBalancer: 公有云，把负载均衡,控制器
