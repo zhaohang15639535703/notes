@@ -663,3 +663,622 @@ node 内网部署应用,外网一般不能访问到:
 手动把可以访问节点添加到nginx
 
 LoadBalancer: 公有云，把负载均衡,控制器
+
+### 2.4 配置管理
+
+#### 2.4.1 Secret
+
+作用： 加密数据存在etcd里面，让Pod容器以挂载Volume的方式进行访问
+
+场景:    凭证
+
+
+
+base64编码
+
+```bash
+$ echo -n "admin" | base64
+```
+
+
+
+1.创建secret加密数据
+
+![image-20230812225624146](./k8s.assets/image-20230812225624146.png)
+
+```bash
+$ kubectl create -f secret.yaml
+$ kubectl get secret
+```
+
+2. 以变量的形式挂载到pod容器中
+
+valueForm
+
+![image-20230812225801050](./k8s.assets/image-20230812225801050.png)
+
+```bash
+$ kubectl apply -f secret-val.yaml
+$ kubectl get pods
+$ kubectl exec -it mypod bash
+$ echo $SECRET_USERNAME
+```
+
+3. 以Volume挂在到数据卷中
+
+![image-20230812230044644](./k8s.assets/image-20230812230044644.png)
+
+![image-20230812230409400](./k8s.assets/image-20230812230409400.png)
+
+```bash
+$ kubectl delete -f secret-val.yaml
+$ kubectl apply -f secret-vol.yaml
+$ kubectl get pods
+$ kubectl exec -it mypod bash
+$ ls /etc/foo
+$ cat /etc/foo/username
+```
+
+#### 2.4.2 ConfigMap
+
+作用：存储不加密数据到etcd中,让Pod以变量或者Volume挂载到容器中
+
+场景：配置文件
+
+
+
+1.创建配置文件
+
+```bash
+$ kubectl delete secret --all
+$ kubectl delete Pod --all
+$ vim redis.properties
+```
+
+2.创建configmap
+
+```bash
+$ kubectl create configmap redis-config --from-file=redis.properties
+# 查看
+$ kubectl get cm
+$ kubectl describe cm redis-config
+```
+
+3.以Volume挂在到Pod容器中
+
+![image-20230812231002642](./k8s.assets/image-20230812231002642.png)
+
+```bash
+$ kubectl apply -f cm.yaml
+# 查看日志
+$ kubectl logs mypod
+```
+
+4.以变量形式挂载
+
+（1）创建yaml,声明变量信息configmap创建
+
+![image-20230812231245649](./k8s.assets/image-20230812231245649.png)
+
+（2）以变量挂载
+
+```bash
+$ kubectl apply -f myconfig.yaml
+$ kubectl get cm
+```
+
+![image-20230812231343142](./k8s.assets/image-20230812231343142.png)
+
+```bash
+$ kubectl apply -f config-var.yaml
+$ kubectl get pods
+$ kubectl get cm
+$ kubectl logs mypod
+```
+
+### 2.5 k8s集群安装机制
+
+#### 2.5.1概述
+
+1. 访问k8s集群的时候要经过三个步骤完成具体操作
+
+   (1) 认证
+
+   (2) 鉴权(授权)
+
+   (3) 准入控制
+
+2. 进行访问的时候，过程中都需要经过apiserver，apiserver做统一协调,比如门卫,访问过程中需要证书,token，或者用户名+密码，如果访问pod需要serviceAccount
+
+
+
+第一步认证 
+
+- 传输安全: 对外不暴露8080端口,只能内部访问,对外使用端口6443
+- 认证： 客户端身份认证常用方式：
+  - https证书认证,基于ca证书
+  - http token认证,通过token识别用户
+  - http 基本认证,用户名+密码认证
+
+
+
+第二步 鉴权
+
+- 基于RBAC进行鉴权操作
+- 基于角色访问控制
+
+
+
+第三步 准入控制
+
+- 就是准入控制器的列表,如果列表友情就内容就通过
+
+
+
+#### 2.5.2 RBAC 基于角色的访问控制
+
+Role Based Access Control
+
+1. 角色
+
+- role: 角色,特定命名空间的访问权限
+
+- clusterRole: 对所有命名空间的访问权限
+
+``` bash
+# 查看命名空间
+$ kubectl get ns
+# 创建命名空间
+$ kubectl create ns roletest
+```
+
+
+
+2. 角色绑定
+
+- roleBinding: 角色绑定到主题
+- ClusterRoleBinding: 集群角色绑定到主体
+
+
+
+3. 主体
+
+- user: 用户
+- group: 用户组
+- serviceAccount: 服务账号
+
+
+
+#### 2.5.3 RBAC实现鉴权
+
+```bash
+# 1.创建命名空间
+$ kubectl create ns roledemo
+# 2.在新的命名空间下创建一个Pod
+$ kubectl run nginx --image=nginx -n roledemo
+```
+
+![image-20230813210253298](./k8s.assets/image-20230813210253298.png)
+
+```bash
+# 3.创建角色
+$ vim rbac-role.yaml
+$ kubectl apply -f rbac-role.yaml
+# 查看命名空间下的角色
+$ kubectl get role -n roledemo
+```
+
+![image-20230813210536202](./k8s.assets/image-20230813210536202.png)
+
+```bash
+# 4.创建角色绑定
+$ vim rbac-rolebing.yaml
+$ kubectl apply -f rbac-rolebinding.yaml
+$ kubectl get role,rolebinding -n roledemo
+```
+
+5. 使用证书
+
+![image-20230813210914825](./k8s.assets/image-20230813210914825.png)
+
+```bash
+$ vim rbac-user.sh
+$ cp /root/TLS/k8s/ca* ./
+$ bash rbac.sh
+$ kubectl get pods -n roledemo
+```
+
+### 2.6 Ingress
+
+#### 2.6.1 概述
+
+1. 把端口号对外暴露，通过ip+端口号进行访问,使用Service里面的NodePort实现
+2. NodePort缺陷
+
+- 在每个节点上都会起到端口，在访问时候通过任何节点,通过节点ip+暴露端口实现访问
+- 意味着灭个端口只能使用一次,一个端口对应一个应用
+- 实际访问中都是用域名，根据不同的域名跳转到不同端口服务中
+
+
+
+#### 2.6.2 Ingress和Pod关系
+
+- pod和ingress通过service关联的
+- ingress作为统一入口,由service关联一组pod
+
+![image-20230813212945120](./k8s.assets/image-20230813212945120.png)
+
+
+
+#### 2.6.3 使用ingress
+
+使用Ingress对外暴露应用
+
+1. 创建nginx应用,对外暴露端口使用
+
+```bash
+$ kubectl create deployment web --image=nginx
+$ kubectl get pods
+$ kubectl get deploy
+$ kubectl expose deployment web --port=80 --target-port=80 --type=NodePort
+$ kubectl get svc
+```
+
+2. 部署ingress controller
+
+![image-20230813214612773](./k8s.assets/image-20230813214612773.png)
+
+```bash
+$ kubectl apply -f ingress-con.yaml
+# 查看ingress controller状态
+$ kubectl get pods -n ingress-nginx
+# 创建ingress规则
+```
+
+![image-20230813220344866](./k8s.assets/image-20230813220344866.png)
+
+```bash
+$ vim ingress-h.yaml
+$ kubectl apply -f ingress-h.yaml
+$ kubectl get pods -n ingress-nginx -o wide
+$ kubectl get ing
+```
+
+### 2.7 Helm
+
+#### 2.7.1 概述
+
+之前部署应用的基本过程：
+
+​    编写yaml文件: deployment,Service,Ingress
+
+
+
+如果使用之前方式部署单一应用,少数服务的应用,比较合适
+
+如果部署微服务项目,可能有几十个服务，每个服务都有一套yaml文件，需要维护大量yaml文件，版本管理特别不方便
+
+
+
+使用helm可以解决哪些问题？
+
+1. 使用helm可以把这些yaml作为一个整体管理
+2. 实现yaml高效服用
+3. 使用helm应用级别的版本管理
+
+
+
+**helm介绍**
+
+Helm是一个k8s的包管理工具,就像Linux下的包管理器如yum/apt等，可以很方便的将之前打包好的yaml文件部署到k8s上
+
+
+
+
+
+**三个重要概念**
+
+- helm
+  - 是一个命令行客户端工具
+
+- Chart
+  - 是把yaml打包，是yaml集合
+
+- Release
+  - 基于chart部署实体,应用级别的版本管理
+
+
+
+![image-20230813222304179](./k8s.assets/image-20230813222304179.png)
+
+https://helm.sh/docs/intro/quickstart/
+
+
+
+**安装**
+
+https://helm.sh/docs/intro/install/
+
+**添加仓库**
+
+```bash
+$ helm repo add brigade https://brigadecore.github.io/charts
+"brigade" has been added to your repositories
+$ helm search repo brigade
+```
+
+#### 2.7.2 使用helm快速部署应用
+
+1. 使用命令搜索应用
+
+```bash
+$ helm search repo 名称
+```
+
+2. 根据搜索内容选择安装
+
+```bash
+$ helm install 安装之后的名称 搜索之后的名称
+```
+
+3. 查看安装后的状态
+
+```bash
+$ helm list
+$ helm status 安装后的名称
+```
+
+example
+
+```bash
+$ helm search repo weave
+$ helm install ui stable/weave-scope
+$ kubectl get pods
+$ kubectl get svc
+# 发现没有暴露端口需要改nodePort
+$ kubectl edit svc ui-weave-scope
+```
+
+#### 2.7.3 如何自己创建Chart
+
+1. 使用命令创建chart
+
+```bash
+$ helm create mychart
+$ cd mychart
+```
+
+- Chart.yaml： 当前chart属性配置信息
+- templates: 编写yaml文件放到这个目录中
+- values.yaml： yaml文件可以使用的全局变量
+
+
+
+
+
+2. 在templates文件夹下创建两个yaml文件
+
+- deployment.yaml
+- service.yaml
+
+```bash
+$ kubectl create deployment web1 --images=nginx --dry-run -o yaml > deployment.yaml
+$ kubectl create deployment web1 --image=nginx
+$ kubectl expose deployment web1 --port=80 --target-port=80 --type=NodePort --dry-run -o yaml > service.yaml
+$ kubectl delete deployment web1
+
+```
+
+3. 安装mychart
+
+```bash
+$ helm install web1 mychart/
+$ kubectl get pods
+$ kubectl get svc
+```
+
+4.应用升级
+
+```bash
+$ helm upgrade chart名称 chart文件夹
+# example
+$ helm upgrade web1 mychart/
+```
+
+#### 2.7.4 实现yaml高效服用
+
+通过传递参数,动态渲染模板,yaml内容动态传入参数生成
+
+1. 在values.yaml定义变量和值
+2. 在具体yaml文件中获取定义变量和值
+
+
+
+- yaml文件大体上有这几个地方是不同的
+  - image
+  - tag
+  - label
+  - port
+  - replicas
+
+
+
+一.在values.yaml定义变量和值
+
+```yaml
+replicas: 1
+image: nginx
+tag: 1.16
+label: nginx
+port: 80
+```
+
+二.在templates的yaml文件中使用values.yaml定义变量
+
+- 通过表达式形式使用全局变量
+
+{{.Values.变量名称}}
+
+比如{{ .Release.Name}}-deploy
+
+{{.Values.image}}
+
+```bash
+$ helm install --dry-run web2 mychart/
+```
+
+### 2.8 持久化存储
+
+数据卷 emptydir,是本地存储,pod重启,数据不存在了,需要对数据持久化存储
+
+#### 2.8.1 nfs 网络存储
+
+pod重启,数据还是在的
+
+
+
+第一步 找一台服务器nfs服务端
+
+(1) 安装nfs
+
+```bash
+$ yum install -y nfs-utils
+```
+
+(2) 设置挂载路径
+
+```bash
+$ vim /etc/exports
+/data/nfs *(rw.no_root_squash)
+```
+
+(3) 对外挂在路径需要先创建出来
+
+```bash
+$ mkdir /data/nfs
+```
+
+
+
+第二步 在k8s集群node节点上安装nfs
+
+```bash
+$ yum install -y nfs-utils
+```
+
+
+
+第三步 在nfs服务器启动nfs服务
+
+```bash
+$ systemctl start nfs
+$ ps -elf | grep nfs
+```
+
+
+
+第四步 在k8s集群中部署应用使用nfs持久网络存储
+
+```bash
+$ mkdir pv
+$ cd pv
+$ vim nfs-nginx.yaml
+```
+
+![image-20230813234508913](./k8s.assets/image-20230813234508913.png)
+
+```bash
+$ kubectl describe pod nginx-dep1-79x79jg79-9sn8gx
+```
+
+#### 2.8.2 PV和PVC
+
+1. PV: 持久化存储，对存储资源进行抽象，对外提供可以调用的地方(生产者)
+2. PVC: 用户调用不需要关心内部实现细节(消费者)
+3. 实现流程：
+
+![image-20230814000402777](./k8s.assets/image-20230814000402777.png)
+
+```bash
+$ vim pvc.yaml
+```
+
+![image-20230814000716288](./k8s.assets/image-20230814000716288.png)
+
+![image-20230814000734065](./k8s.assets/image-20230814000734065.png)
+
+```bash
+$ kubectl apply -f pvc.yaml
+```
+
+```bash 
+$ vim pv.yaml
+```
+
+![image-20230814000835192](./k8s.assets/image-20230814000835192.png)
+
+```bash
+$ kubectl apply -f pv.yaml
+$ kubectl get pv,pvc
+$ kubectl get pods
+$ kubectl exec -it nginx-dep1-79u99x9g68s bash
+$ ls /usr/share/nginx/html
+```
+
+
+
+### 2.9 k8s集群资源架空
+
+#### 2.9.1 监控指标
+
+1. 集群监控
+   - 节点资源利用率
+   - 节点数
+   - 运行pods
+2. Pod监控
+   - 容器指标
+   - 应用程序
+
+#### 2.9.2 监控平台
+
+prometheus+Grafana
+
+(1) prometheus
+
+- 开源的
+- 监控，报警，数据库
+- 以HTTP协议周期性抓取被监控的组件状态
+- 不需要复杂的继承过程,使用http接口接入就可以了
+
+(2) Grafana
+
+- 开源的数据分析和可视化工具
+- 支持多种数据源
+
+
+
+部署：
+
+https://developer.aliyun.com/article/836300
+
+## 3.搭建高可用集群
+
+![image-20230814110254843](./k8s.assets/image-20230814110254843.png)
+
+#### 3.1 高可用集群技术
+
+![image-20230814110600606](./k8s.assets/image-20230814110600606.png)
+
+#### 3.2 部署
+
+![image-20230814110906214](./k8s.assets/image-20230814110906214.png)
+
+https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/high-availability/
+
+## 4.部署一个java项目
+
+#### 4.1容器交付流程
+
+![image-20230814111817065](./k8s.assets/image-20230814111817065.png)
+
+![image-20230814112154349](./k8s.assets/image-20230814112154349.png)
