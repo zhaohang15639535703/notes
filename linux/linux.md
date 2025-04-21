@@ -971,3 +971,179 @@ page cache的页面回收流程
 ![image-20250420163508480](./linux.assets/image-20250420163508480.png)
 
 - 当zone处于高水位时会让kswapd睡眠
+
+
+
+**页面回收详细流程图**
+
+![image-20250421101909373](./linux.assets/image-20250421101909373.png)
+
+
+
+## 匿名页面的生命周期
+
+- maclloc/mmap接口分配的内存->do_anonymous_page()
+- 写时复制：当缺页中断出现写保护错误时，新分配的页面是匿名页面
+- do_swap_page() 从swap分区读回数据时会新分配匿名页面
+- 迁移页面
+
+
+
+**分配**
+
+- do_anonymous_page()分配一个匿名页面anon_page为例子，anon_page刚分配的状态如下：
+  - page->_count = 1
+  - page->_mapcount=0
+  - 设置PG_swapbacked标志位
+  - 加入LRU_ACTIVE_ANON链表里
+  - page->mapping指向VMA中的anon_vma数据结构
+
+**使用**
+
+- 匿名页面在缺页中分配完成之后，就建立了进程虚拟地址空间VMA和物理页面的映射关系，用户进程访问虚拟地址即访问到匿名页面的内容
+
+**换出**
+
+- 活跃链表->不活跃链表
+
+- 第一次扫描不活跃链表
+
+  - add_to_swap()函数会为该页分配swap分区空间
+
+  ![image-20250421102902811](./linux.assets/image-20250421102902811.png)
+
+  - try_to_unmap()
+
+  ![image-20250421102932633](./linux.assets/image-20250421102932633.png)
+
+  - pageout()
+
+![image-20250421102951418](./linux.assets/image-20250421102951418.png)
+
+- 第二次扫描不活跃链表
+
+  - 假设第二次扫描不活跃链表时，该页写入swap分区已经完成。Block layer层的回调函数end_swap_bio_write()->end_page_writeback()会完成如下动作：
+
+    - 清除PG_writeback标志位
+    - 唤醒等待在该页PG_writeback的线程，见wake_up_page(page,PG_writeback)函数
+
+  - shrink_page_list()->__remove_mapping()函数作用如下
+
+    - page_freeze_refs(page,2)判断当前page->_count是否为2，并且将该计数设置为0
+    - 清PG_swapcache标志位
+    - 清PG_locked标志位
+
+    ![image-20250421103451567](./linux.assets/image-20250421103451567.png)
+
+最后把page加入free_page链表中，释放该页，因此该anon_page页的状态是页面的内容已经写入swap分区，实际物理页面已经释放
+
+**匿名页面的换入**
+
+- 匿名页面被换出到swap分区后，如果应用程序需要读写这个页面，缺页中断发生，因为pte中的present比特位显示该页不在内存中，但pte表项不为空，说明该页在swap分区中，因此调用do_swap_page()函数重新读入该页的内容
+
+**匿名页面的释放**
+
+- 当用户进程关闭或者退出时，会扫描这个用户进程所有的VMAs，并会青醋这些VMAs，如果符合释放标准，相关页面会被释放
+
+![image-20250421104044247](./linux.assets/image-20250421104044247.png)
+
+## 页面迁移
+
+**NUMA**:Non-Uniform Memory Access 非统一内存访问
+
+- 每个处理器有**自己的本地内存（Node Local Memory）**。
+
+- 也可以访问其他处理器的内存（Remote Memory），但速度更慢。
+
+- 常见于**多路服务器、大型多核系统**。
+
+![image-20250421104440025](./linux.assets/image-20250421104440025.png)
+
+
+
+**UMA**:Uniform Memory Access 统一内存访问
+
+- **所有处理器共享一块物理内存**。
+
+- **访问速度一致**，也就是 **访问任意内存的延迟是相同的**。
+
+- 常见于**小型多核系统**、**对称多处理器系统（SMP）**。
+
+
+
+**libnuma**
+
+![image-20250421104654986](./linux.assets/image-20250421104654986.png)
+
+迁移一个进程的所有页面从一个内存结点到另外一个内存结点
+
+pid 进程的PID
+
+maxnode: node的最大数量
+
+old_nodes: 指向nodes的一个bit mask，这是进程所在的nodes
+
+new_nodes: 指向要迁移目的地的一个node mask
+
+![image-20250421104900849](./linux.assets/image-20250421104900849.png)
+
+迁移进程的部分页面到新的内存结点
+
+
+
+**migrae_pages**
+
+![image-20250421105046978](./linux.assets/image-20250421105046978.png)
+
+![image-20250421105136142](./linux.assets/image-20250421105136142.png)
+
+![image-20250421105224385](./linux.assets/image-20250421105224385.png)
+
+MIGRATE_ASYNC 异步模式，不会阻塞
+
+MIGRATE_SYNC 同步模式，过程会阻塞
+
+![image-20250421105333121](./linux.assets/image-20250421105333121.png)
+
+**页面迁移的流程**
+
+![image-20250421105854490](./linux.assets/image-20250421105854490.png)
+
+## 内存规整
+
+**memory compaction**
+
+内存碎片换产生的原因
+
+- Linux内核的物理内存是由伙伴系统来管理的
+- 伙伴系统由11个2的order次方的链表组成,order从0~10
+- 伙伴系统有切蛋糕的习惯
+- 伙伴系统可以有神奇的修复功能
+
+![image-20250421110740896](./linux.assets/image-20250421110740896.png)
+
+![image-20250421111246026](./linux.assets/image-20250421111246026.png)
+
+## KSM
+
+![image-20250421111830980](./linux.assets/image-20250421111830980.png)
+
+**如何使用KSM**
+
+- 使能KSM:
+  - madvise(addr,length,MADV_MERGEA_BLE)
+- 关闭KSM:
+  - madvise(addr,length,MADV_UNMERGEABLE)
+- android的bionic库中的mmap函数默认打开了KSM
+
+![image-20250421112053191](./linux.assets/image-20250421112053191.png)
+
+**KSM的统计计数**
+
+- run : 这个结点写1，表示启动ksmd内核线程，写0表示要停止ksmd内核线程
+- pages_to_scan：单次扫描的页数，ksmd内核线程每次被唤醒之后，会扫描多少个页面
+- sleep_millisecs: ksmd在下一次扫描前睡眠多长时间，单位毫秒
+- pages_shared: 共享的页面数，如果1000个页面均为同一个内容，然后合并成一个页面，这里pages_shared等于1
+- pages_sharing: 可共享的页面数，如果1000个页面合并成一个页面，那么pages-sharing就是1000
+- pages_unshared：当前没有合并的页面数量，通常是unstable页面的数量
+- full_scans：从头到尾扫描的次数
