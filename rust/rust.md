@@ -1,183 +1,3 @@
-# Other
-
-## 1.错误处理：
-
-### unreachable!()
-
-这是标记程序不应输入的路径的标准宏。如果程序进入这些路径，程序将panicked并返回"'internal error: entered unreachable code'"错误消息。
-
-
-
-```rust
-fn main() {
-    let level = 22;
-    let stage = match level {
-        1...5 => "beginner",
-        6...10 => "intermediate",
-        11...20 => "expert",
-        _ => unreachable!(),
-    };
-
-    println!("{}", stage);
-}
-
-
-// -------------- Compile time error --------------
-thread 'main' panicked at 'internal error: entered unreachable code', src/main.rs:7:20
-```
-
-我们也可以为此设置自定义错误消息。
-
-
-
-```rust
-// --- with a custom message ---
-_ => unreachable!("Custom message"),
-// -------------- Compile time error --------------
-thread 'main' panicked at 'internal error: entered unreachable code: Custom message', src/main.rs:7:20
-
-
-// --- with debug data ---
-_ => unreachable!("level is {}", level),
-// -------------- Compile time error --------------
-thread 'main' panicked at 'internal error: entered unreachable code: level is 22', src/main.rs:7:14
-```
-
-## 2.misconception corollaries
-
-### 2.1 if `T: 'static` then `T` must be valid for the entire program
-
-**Misconception Corollaries**
-
-- `T: 'static` should be read as *"`T` has a `'static` lifetime"*
-- `&'static T` and `T: 'static` are the same thing
-- if `T: 'static` then `T` must be immutable
-- if `T: 'static` then `T` can only be created at compile time
-
-Most Rust beginners get introduced to the `'static` lifetime for the first time in a code example that looks something like this:
-
-```rust
-fn main() {
-    let str_literal: &'static str = "str literal";
-}
-```
-
-
-
-They get told that `"str literal"` is hardcoded into the compiled binary and is loaded into read-only memory at run-time so it's immutable and valid for the entire program and that's what makes it `'static`. These concepts are further reinforced by the rules surrounding defining `static` variables using the `static` keyword.
-
-```rust
-// Note: This example is purely for illustrative purposes.
-// Never use `static mut`. It's a footgun. There are
-// safe patterns for global mutable singletons in Rust but
-// those are outside the scope of this article.
-
-static BYTES: [u8; 3] = [1, 2, 3];
-static mut MUT_BYTES: [u8; 3] = [1, 2, 3];
-
-fn main() {
-   MUT_BYTES[0] = 99; // ❌ - mutating static is unsafe
-
-    unsafe {
-        MUT_BYTES[0] = 99;
-        assert_eq!(99, MUT_BYTES[0]);
-    }
-}
-```
-
-
-
-Regarding `static` variables
-
-- they can only be created at compile-time
-- they should be immutable, mutating them is unsafe
-- they're valid for the entire program
-
-The `'static` lifetime was probably named after the default lifetime of `static` variables, right? So it makes sense that the `'static` lifetime has to follow all the same rules, right?
-
-Well yes, but a type *with* a `'static` lifetime is different from a type *bounded by* a `'static` lifetime. The latter can be dynamically allocated at run-time, can be safely and freely mutated, can be dropped, and can live for arbitrary durations.
-
-It's important at this point to distinguish `&'static T` from `T: 'static`.
-
-`&'static T` is an immutable reference to some `T` that can be safely held indefinitely long, including up until the end of the program. This is only possible if `T` itself is immutable and does not move *after the reference was created*. `T` does not need to be created at compile-time. It's possible to generate random dynamically allocated data at run-time and return `'static` references to it at the cost of leaking memory, e.g.
-
-```rust
-use rand;
-
-// generate random 'static str refs at run-time
-fn rand_str_generator() -> &'static str {
-    let rand_string = rand::random::<u64>().to_string();
-    Box::leak(rand_string.into_boxed_str())
-}
-```
-
-
-
-`T: 'static` is some `T` that can be safely held indefinitely long, including up until the end of the program. `T: 'static` includes all `&'static T` however it also includes all owned types, like `String`, `Vec`, etc. The owner of some data is guaranteed that data will never get invalidated as long as the owner holds onto it, therefore the owner can safely hold onto the data indefinitely long, including up until the end of the program. `T: 'static` should be read as *"`T` is bounded by a `'static` lifetime"* not *"`T` has a `'static` lifetime"*. A program to help illustrate these concepts:
-
-```rust
-use rand;
-
-fn drop_static<T: 'static>(t: T) {
-    std::mem::drop(t);
-}
-
-fn main() {
-    let mut strings: Vec<String> = Vec::new();
-    for _ in 0..10 {
-        if rand::random() {
-            // all the strings are randomly generated
-            // and dynamically allocated at run-time
-            let string = rand::random::<u64>().to_string();
-            strings.push(string);
-        }
-    }
-
-    // strings are owned types so they're bounded by 'static
-    for mut string in strings {
-        // all the strings are mutable
-        string.push_str("a mutation");
-        // all the strings are droppable
-        drop_static(string); // ✅
-    }
-
-    // all the strings have been invalidated before the end of the program
-    println!("I am the end of the program");
-}
-```
-
-
-
-**Key Takeaways**
-
-- `T: 'static` should be read as *"`T` is bounded by a `'static` lifetime"*
-
-- if `T: 'static` then `T` can be a borrowed type with a `'static` lifetime *or* an owned type
-
-- since
-
-   
-
-  ```
-  T: 'static
-  ```
-
-   
-
-  includes owned types that means
-
-  
-
-  ```
-  T
-  ```
-
-  - can be dynamically allocated at run-time
-  - does not have to be valid for the entire program
-  - can be safely and freely mutated
-  - can be dynamically dropped at run-time
-  - can have lifetimes of different durations
-
 # 一.Cargo
 
 ## 1.创建项目
@@ -12356,3 +12176,182 @@ fn main() {
 }
 ```
 
+# Other
+
+## 1.错误处理：
+
+### unreachable!()
+
+这是标记程序不应输入的路径的标准宏。如果程序进入这些路径，程序将panicked并返回"'internal error: entered unreachable code'"错误消息。
+
+
+
+```rust
+fn main() {
+    let level = 22;
+    let stage = match level {
+        1...5 => "beginner",
+        6...10 => "intermediate",
+        11...20 => "expert",
+        _ => unreachable!(),
+    };
+
+    println!("{}", stage);
+}
+
+
+// -------------- Compile time error --------------
+thread 'main' panicked at 'internal error: entered unreachable code', src/main.rs:7:20
+```
+
+我们也可以为此设置自定义错误消息。
+
+
+
+```rust
+// --- with a custom message ---
+_ => unreachable!("Custom message"),
+// -------------- Compile time error --------------
+thread 'main' panicked at 'internal error: entered unreachable code: Custom message', src/main.rs:7:20
+
+
+// --- with debug data ---
+_ => unreachable!("level is {}", level),
+// -------------- Compile time error --------------
+thread 'main' panicked at 'internal error: entered unreachable code: level is 22', src/main.rs:7:14
+```
+
+## 2.misconception corollaries
+
+### 2.1 if `T: 'static` then `T` must be valid for the entire program
+
+**Misconception Corollaries**
+
+- `T: 'static` should be read as *"`T` has a `'static` lifetime"*
+- `&'static T` and `T: 'static` are the same thing
+- if `T: 'static` then `T` must be immutable
+- if `T: 'static` then `T` can only be created at compile time
+
+Most Rust beginners get introduced to the `'static` lifetime for the first time in a code example that looks something like this:
+
+```rust
+fn main() {
+    let str_literal: &'static str = "str literal";
+}
+```
+
+
+
+They get told that `"str literal"` is hardcoded into the compiled binary and is loaded into read-only memory at run-time so it's immutable and valid for the entire program and that's what makes it `'static`. These concepts are further reinforced by the rules surrounding defining `static` variables using the `static` keyword.
+
+```rust
+// Note: This example is purely for illustrative purposes.
+// Never use `static mut`. It's a footgun. There are
+// safe patterns for global mutable singletons in Rust but
+// those are outside the scope of this article.
+
+static BYTES: [u8; 3] = [1, 2, 3];
+static mut MUT_BYTES: [u8; 3] = [1, 2, 3];
+
+fn main() {
+   MUT_BYTES[0] = 99; // ❌ - mutating static is unsafe
+
+    unsafe {
+        MUT_BYTES[0] = 99;
+        assert_eq!(99, MUT_BYTES[0]);
+    }
+}
+```
+
+
+
+Regarding `static` variables
+
+- they can only be created at compile-time
+- they should be immutable, mutating them is unsafe
+- they're valid for the entire program
+
+The `'static` lifetime was probably named after the default lifetime of `static` variables, right? So it makes sense that the `'static` lifetime has to follow all the same rules, right?
+
+Well yes, but a type *with* a `'static` lifetime is different from a type *bounded by* a `'static` lifetime. The latter can be dynamically allocated at run-time, can be safely and freely mutated, can be dropped, and can live for arbitrary durations.
+
+It's important at this point to distinguish `&'static T` from `T: 'static`.
+
+`&'static T` is an immutable reference to some `T` that can be safely held indefinitely long, including up until the end of the program. This is only possible if `T` itself is immutable and does not move *after the reference was created*. `T` does not need to be created at compile-time. It's possible to generate random dynamically allocated data at run-time and return `'static` references to it at the cost of leaking memory, e.g.
+
+```rust
+use rand;
+
+// generate random 'static str refs at run-time
+fn rand_str_generator() -> &'static str {
+    let rand_string = rand::random::<u64>().to_string();
+    Box::leak(rand_string.into_boxed_str())
+}
+```
+
+
+
+`T: 'static` is some `T` that can be safely held indefinitely long, including up until the end of the program. `T: 'static` includes all `&'static T` however it also includes all owned types, like `String`, `Vec`, etc. The owner of some data is guaranteed that data will never get invalidated as long as the owner holds onto it, therefore the owner can safely hold onto the data indefinitely long, including up until the end of the program. `T: 'static` should be read as *"`T` is bounded by a `'static` lifetime"* not *"`T` has a `'static` lifetime"*. A program to help illustrate these concepts:
+
+```rust
+use rand;
+
+fn drop_static<T: 'static>(t: T) {
+    std::mem::drop(t);
+}
+
+fn main() {
+    let mut strings: Vec<String> = Vec::new();
+    for _ in 0..10 {
+        if rand::random() {
+            // all the strings are randomly generated
+            // and dynamically allocated at run-time
+            let string = rand::random::<u64>().to_string();
+            strings.push(string);
+        }
+    }
+
+    // strings are owned types so they're bounded by 'static
+    for mut string in strings {
+        // all the strings are mutable
+        string.push_str("a mutation");
+        // all the strings are droppable
+        drop_static(string); // ✅
+    }
+
+    // all the strings have been invalidated before the end of the program
+    println!("I am the end of the program");
+}
+```
+
+
+
+**Key Takeaways**
+
+- `T: 'static` should be read as *"`T` is bounded by a `'static` lifetime"*
+
+- if `T: 'static` then `T` can be a borrowed type with a `'static` lifetime *or* an owned type
+
+- since
+
+   
+
+  ```
+  T: 'static
+  ```
+
+   
+
+  includes owned types that means
+
+  
+
+  ```
+  T
+  ```
+
+  - can be dynamically allocated at run-time
+  - does not have to be valid for the entire program
+  - can be safely and freely mutated
+  - can be dynamically dropped at run-time
+  - can have lifetimes of different durations
