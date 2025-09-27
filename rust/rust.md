@@ -1,12 +1,12 @@
 # 一.Cargo
 
-## 1.创建项目
+## 创建项目
 
 cargo new 项目名称
 
 帮助信息
 
-```plain
+```bash
 Create a new cargo package at <path>
 
 Usage: cargo.exe new [OPTIONS] <path>
@@ -38,7 +38,7 @@ Run `cargo help new` for more detailed information.
 
 TOML(Tom's Obvious,Minimal Language)格式，是Cargo的配置格式
 
-```plain
+```toml
 [package]#区域标题，表示一下面是用来配置包package的
 name = "hello" #项目名称
 version = "0.1.0" #项目版本
@@ -52,9 +52,11 @@ edition = "2021" #使用的Rust版本
 
 在Rust中，代码的包叫做**crate**
 
-## 2.构建Cargo项目
+## 构建Cargo项目
 
+```bash
 cargo build
+```
 
 创建可执行文件target/debug/hello_cargo或target\debug\hello_cargo.exe(Windows)
 
@@ -64,62 +66,35 @@ cargo build
 
 该文件负责追踪项目依赖的精确版本，不需要手动修改该文件
 
-## 3.构建和运行Cargo项目
+## 构建和运行Cargo项目
 
+```bash
 cargo run
+```
 
 如果之前编译过且代码没有修改的话会直接执行
 
-## 4.cargo check
+## cargo check
 
+```bash
 cargo check
+```
 
 检查代码，确保能通过编译，但是不产生任何可执行文件
 
 cargo check比cargo build快得多
 
-## 5.发布构建
+## 发布构建
 
+```bash
 cargo build --release
+```
 
 编译时会进行优化，代码运行的更快但是编译时间更长
 
 会在target/release而不是target/debug生成可执行文件
 
-# 二.猜数游戏
-
-```plain
-use rand::Rng;
-use std::cmp::Ordering;
-use std::io;
-fn main() {
-    println!("猜数");
-    println!("猜一个数");
-    let secret_number = rand::thread_rng().gen_range(1..101);
-    println!("secret_number: {}", secret_number);
-
-    loop {
-        let mut guess = String::new();
-        io::stdin().read_line(&mut guess).expect("无法运行");
-        println!("你猜测的数是{}", guess);
-        //shadow
-        let guess: u32 = match guess.trim().parse(){
-            Ok(num)=>num,
-            Err(_)=>continue
-        };
-        match guess.cmp(&secret_number) {
-            Ordering::Less => println!("too small!"),
-            Ordering::Greater => println!("too big!"),
-            Ordering::Equal => {
-                println!("you win!");
-                break;
-            },
-        }
-    }
-}
-```
-
-# 三.变量与可变性
+# 二.变量与可变性
 
 ### **变量**
 
@@ -143,7 +118,7 @@ let mut x = 3;
 
 4.最后一个区别是，常量只能被设置为**常量表达式**，而**不可以是其他任何只能在运行时计算出的值**。
 
-```plain
+```rust
 const THREE_HOURS_IN_SECONDS: u32 = 60 * 60 * 3;
 const MAX_POINTS:u32 = 100_000;
 ```
@@ -152,7 +127,7 @@ const MAX_POINTS:u32 = 100_000;
 
 ### 隐藏(shadow)
 
-```plain
+```rust
 fn main() {
     let x = 5;
 
@@ -179,7 +154,7 @@ shadow和把变量标记为mut**是不一样的**
 
 两种方式
 
-```plain
+```rust
 fn main() {
     let _x = 1;
 }
@@ -189,7 +164,7 @@ fn main() {
 }
 ```
 
-# 四.数据类型
+# 三.数据类型
 
 Rust是静态编译语言，编译时必须知道所有变量的类型
 
@@ -201,7 +176,7 @@ Rust 有四种基本的标量类型：整型、浮点型、布尔类型和字符
 
 如果我们没有显式的给予变量一个类型，那编译器会自动帮我们推导一个类型
 
-```plain
+```rust
 fn main(){
     let x = 5;
     assert_eq!("i32".to_string(),type_of(&x));
@@ -214,7 +189,7 @@ fn type_of<T>(_: &T) -> String{
 
 整数如果不赋予类型默认为i32类型
 
-```plain
+```rust
 fn main() {
     let v: u16 = 38_u8 as u16;
 }
@@ -231,7 +206,7 @@ fn main() {
 
 isize 和 usize 类型依赖运行程序的计算机架构：64 位架构上它们是 64 位的， 32 位架构上它们是 32 位的。
 
-```plain
+```rust
 fn main() {
     assert_eq!(i8::MAX, 127); 
     assert_eq!(u8::MAX, 255); 
@@ -261,7 +236,7 @@ Rust 的数字类型默认是 i32。isize 或 usize 主要作为某些集合的�
 - 用 overflowing_* 方法返回值和一个布尔值，表示是否出现溢出
 - 用 saturating_* 方法在值的最小值或最大值处进行饱和处理
 
-```plain
+```rust
 // 解决代码中的错误和 `panic`
 fn main() {
    let v1 = 251_u8 + 8;
@@ -272,7 +247,7 @@ fn main() {
 
 修改
 
-```plain
+```rust
 fn main() {
     let v1 = 247_u8 + 8;
     let v2 = i8::checked_add(119, 8).unwrap();
@@ -290,7 +265,7 @@ fn main() {
 
 Rust 的浮点数类型是 f32 和 f64，分别占 32 位和 64 位。默认类型是 f64，因为在现代 CPU 中，它与 f32 速度几乎一样，不过精度更高。所有的浮点型都是有符号的。
 
-```plain
+```rust
 fn main() {
     let x = 2.0; // f64
 
@@ -300,7 +275,7 @@ fn main() {
 
 浮点数采用 IEEE-754 标准表示。f32 是单精度浮点数，f64 是双精度浮点数。
 
-```plain
+```rust
 fn main() {
     let x = 1_000.000_1; // f64
     let y: f32 = 0.12; // f32
@@ -312,7 +287,7 @@ fn main() {
 
 Rust 中的所有数字类型都支持基本数学运算：加法、减法、乘法、除法和取余。整数除法会**向下舍入**到最接近的整数
 
-```plain
+```rust
 fn main() {
     assert_eq!(0.1+0.2,0.3);//报错
  }
@@ -323,7 +298,7 @@ thread 'main' panicked at 'assertion failed: `(left == right)`
 
 两种修改方法
 
-```plain
+```rust
 fn main() {
     assert!(0.1+0.2>=0.3);
 }
@@ -334,7 +309,7 @@ fn main() {
 
 **计算**
 
-```plain
+```rust
 use std::fmt::Display;
 
 #[allow(unused_variables)]
@@ -373,7 +348,7 @@ fn main() {
 
 ### 序列
 
-```plain
+```rust
 fn main() {
     let mut sum = 0;
     for i in -3..2 {
@@ -397,7 +372,7 @@ fn main() {
 
 Rust 中的布尔类型使用 bool 表示
 
-```plain
+```rust
 fn main() {
     let t = true;
 
@@ -416,7 +391,7 @@ fn main() {
 
 Rust的 char 类型是语言中最原生的字母类型
 
-```plain
+```rust
 fn main() {
     let c = 'z';
     let z: char = 'ℤ'; // with explicit type annotation
@@ -436,7 +411,7 @@ fn print_char(c : char) {
 
 **大小**
 
-```plain
+```rust
 #[allow(unused_variables)]
 
 use std::mem::size_of_val;
@@ -453,7 +428,7 @@ fn main() {
 
 ### 单元类型
 
-```plain
+```rust
 fn main() {
     let _v: () = ();
 
@@ -470,7 +445,7 @@ fn implicitly_ret_unit() {
 
 **单元类型所占的内存为0！！！**
 
-```plain
+```rust
 use std::mem::size_of_val;
 fn main() {
     let unit: () = ();
@@ -490,7 +465,7 @@ fn main() {
 
 使用包含在圆括号中的逗号分隔的值列表来创建一个元组。元组中的每一个位置都有一个类型，而且这些不同值的**类型也不必是相同的**
 
-```plain
+```rust
 fn main() {
     let tup: (i32, f64, u8) = (500, 6.4, 1);
 }
@@ -498,7 +473,7 @@ fn main() {
 
 tup 变量绑定到整个元组上，因为元组是一个单独的复合元素。为了从元组中获取单个值，可以使用**模式匹配**（pattern matching）来**解构**（destructure）元组值，像这样：
 
-```plain
+```rust
 fn main() {
     let tup = (500, 6.4, 1);
 
@@ -518,11 +493,11 @@ fn main() {
 }
 ```
 
-程序首先创建了一个元组并绑定到 tup 变量上。接着使用了 let 和一个模式将 tup 分成了三个不同的变量，x、y 和 z。这叫做 **解构**（*destructuring*），因为它将一个元组拆成了三个部分。
+程序首先创建了一个元组并绑定到 tup 变量上。接着使用了 let 和一个模式将 tup 分成了三个不同的变量，x、y 和 z。这叫做 **解构**（***destructuring***），因为它将一个元组拆成了三个部分。
 
-也可以使用点号（.）后跟值的索引来直接访问它们。元组的第一个索引值是 0。例如：
+也可以**使用点号（.）后跟值的索引来直接访问它们**。元组的第一个索引值是 0。例如：
 
-```plain
+```rust
 fn main() {
     let x: (i32, f64, u8) = (500, 6.4, 1);
 
@@ -538,7 +513,7 @@ fn main() {
 
 **过长的元组无法打印**
 
-```plain
+```rust
 // 修复代码错误
 fn main() {
     let too_long_tuple = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13);
@@ -555,7 +530,7 @@ fn main() {
 
 与元组不同，数组中的每个元素的类型必须相同。Rust 中的数组与一些其他语言中的数组不同，Rust中的数组长度是固定的。
 
-**数组的类型是** **[T; Length]****，数组的长度是类型签名的一部分，因此数组的长度必须在编译期就已知，**
+**数组的类型是[T; Length]**，**数组的长度是类型签名的一部分，因此数组的长度必须在编译期就已知，**
 
 vector 类型是标准库提供的一个 允许 增长和缩小长度的类似数组的集合类型。当不确定是应该使用数组还是 vector 的时候，那么很可能应该使用 vector。
 
@@ -565,7 +540,7 @@ let a: [i32; 5] = [1, 2, 3, 4, 5];
 
 这里，i32 是每个元素的类型。分号之后，数字 5 表明该数组包含五个元素。
 
-```plain
+```rust
 fn main() {
     // 很多时候，我们可以忽略数组的部分类型，也可以忽略全部类型，让编译器帮助我们推导
     let arr0 = [1, 2, 3];
@@ -579,7 +554,9 @@ fn main() {
 
 还可以通过在方括号中指定初始值加分号再加元素个数的方式来创建一个**每个元素都为相同值的数组**：
 
+```rust
 let a = [3; 5];
+```
 
 变量名为 a 的数组将包含 5 个元素，这些元素的值最初都将被设置为 3。这种写法与 let a = [3, 3, 3, 3, 3]; 效果相同，但更简洁。
 
@@ -587,7 +564,7 @@ let a = [3; 5];
 
 数组是可以在栈(stack)上分配的已知固定大小的单个内存块。可以使用索引来访问数组的元素，像这样：
 
-```plain
+```rust
 fn main() {
     let a = [1, 2, 3, 4, 5];
 
@@ -607,7 +584,7 @@ fn main() {
 
 **无效的数组访问**
 
-如果我们访问数组结尾之后的元素，程序在索引操作中使用一个无效的值时导致 **运行时** 错误。程序带着错误信息退出。当尝试用索引访问一个元素时，Rust 会检查指定的索引是否小于数组的长度。如果索引超出了数组长度，Rust 会 *panic*，这是 Rust 术语，它用于程序因为错误而退出的情况。这种检查必须在运行时进行，特别是在某些情况下，因为编译器不可能知道用户在以后运行代码时将输入什么值。
+如果我们访问数组结尾之后的元素，程序在索引操作中使用一个无效的值时导致 **运行时** 错误。程序带着错误信息退出。当**尝试用索引访问一个元素时，Rust 会检查指定的索引是否小于数组的长度。如果索引超出了数组长度，Rust 会 *panic***，这是 Rust 术语，它用于程序因为错误而退出的情况。**这种检查必须在运行时进行**，特别是在某些情况下，因为编译器不可能知道用户在以后运行代码时将输入什么值。
 
 ## 类型转换
 
@@ -615,7 +592,7 @@ fn main() {
 
 1.Rust 并没有为基本类型提供隐式的类型转换( coercion )，但是我们可以通过 as 来进行显式地转换。
 
-```plain
+```rust
 #[allow(unused_variables)]
 fn main() {
   let decimal = 97.123_f32;
@@ -634,7 +611,7 @@ fn main() {
 
 2.默认情况下, 数值溢出会导致编译错误，但是我们可以通过添加一行全局注解的方式来避免编译错误(溢出还是会发生)
 
-```plain
+```rust
 #![allow(overflowing_literals)]
 fn main() {
     assert_eq!(u8::MAX, 255);
@@ -1514,7 +1491,7 @@ fn main() {
 }
 ```
 
-# 五.所有权
+# 四.所有权，引用与借用
 
 ## 栈（Stack）与堆（Heap）
 
@@ -2464,7 +2441,7 @@ fn main() {
 }
 ```
 
-# 六.结构体
+# 五.结构体
 
 ## 定义结构体
 
@@ -2821,7 +2798,7 @@ fn main() {
 }
 ```
 
-# 七.枚举
+# 六.枚举
 
 ## 定义枚举
 
@@ -3123,7 +3100,7 @@ fn main() {
 }
 ```
 
-# 八.模式匹配
+# 七.模式匹配
 
 ## match控制流结构
 
@@ -3359,7 +3336,7 @@ fn main() {
 //age 是一个新的变量，它的值是 30
 ```
 
-# 九.Package,Crate,Module
+# 八.Package,Crate,Module
 
 - **包**（*Packages*）： Cargo 的一个功能，它允许你构建、测试和分享 crate。
 - **Crate** ：一个模块的树形结构，它形成了库或二进制项目。
@@ -3770,7 +3747,7 @@ pub fn add_to_waitlist() {}
 
 随着模块逐渐变大，该技术可以把模块的内容移动到其他文件中
 
-# 十.常见集合
+# 九.常见集合
 
 ## Vector
 
@@ -4835,7 +4812,7 @@ hash.insert(42, "the answer");
 assert_eq!(hash.get(&42), Some(&"the answer"));
 ```
 
-# 十一.错误处理
+# 十.错误处理
 
 大部分情况下，在编译时提示错误，并处理
 
@@ -5333,7 +5310,7 @@ fn main() -> Result<(), ParseIntError> {
 }
 ```
 
-# 十二.泛型
+# 十一.泛型
 
 ## 函数中定义泛型
 
@@ -5700,7 +5677,7 @@ fn main() {
 
 在编译时，rust会将Option泛型展开为Option<i32>和Option<i64>类型
 
-# 十三.Trait：定义共同行为
+# 十二.Trait：定义共同行为
 
 trait告诉Rust编译器，某种类型具有哪些并且可以与其他类型共享的功能
 
@@ -6254,7 +6231,7 @@ fn main() {
 }
 ```
 
-# 十四.生命周期
+# 十三.生命周期
 
 - Rust的每个引用都有自己的生命周期
 - 生命周期：引用保持有效的作用域
@@ -6597,7 +6574,7 @@ where
 }
 ```
 
-# 十五.编写自动化测试
+# 十四.编写自动化测试
 
 Rust 中的测试函数是用来验证非测试代码是否是按照期望的方式运行的。测试函数体通常执行如下三种操作：
 
@@ -7127,7 +7104,7 @@ fn it_adds_two() {
 - 只有library crate在能暴露函数给其它crate使用
 - binary crate意味着独立运行
 
-# 十六.IO项目:构建命令行程序
+# 十五.IO项目:构建命令行程序
 
 ## 接收命令行参数
 
@@ -7289,7 +7266,7 @@ fn main() {
 }
 ```
 
-# 十七.函数式语言特性:迭代器和闭包
+# 十六.函数式语言特性:迭代器和闭包
 
 ## 闭包
 
@@ -8059,7 +8036,7 @@ In general, C++ implementations obey the zero-overhead principle: What you don�
 
 - 本贾尼·斯特劳斯特卢普 "Foundations of C++"
 
-# 十八.Cargo 和crates.io
+# 十七.Cargo 和crates.io
 
 ## 采用发布配置自定义构建
 
@@ -8369,7 +8346,7 @@ cargo something
 - 类似这样的自定义命令可以通过该命令列出: cargo --list
 - 优点: 可以使用cargo install来安装扩展，像内置工具一样来运行
 
-# 十九.智能指针
+# 十八.智能指针
 
 - **指针** （*pointer*）是一个包含内存地址的变量的通用概念。
 
@@ -9376,7 +9353,7 @@ fn main() {
 
 所有这些管理计数和值的逻辑都内建于 Rc<T> 和 Weak<T> 以及它们的 Drop trait 实现中。通过在 Node 定义中指定从子节点到父节点的关系为一个Weak<T>引用，就能够拥有父节点和子节点之间的双向引用而不会造成引用循环和内存泄漏。
 
-# 二十.无畏并发
+# 十九.无畏并发
 
 - **并发编程**（*Concurrent programming*），代表程序的不同部分相互独立的执行，
 - **并行编程**（*parallel programming*）代表程序不同部分于同时执行
@@ -10019,7 +9996,7 @@ Rust 的并发模型中一个有趣的方面是：语言本身对并发知之 **
 
 当前重要的是，在创建新的由不是 Send 和 Sync 的部分构成的并发类型时需要多加小心，以确保维持其安全保证。[“The Rustonomicon”](https://doc.rust-lang.org/nomicon/index.html) 中有更多关于这些保证以及如何维持他们的信息。
 
-# 二十一.Rust的面向对象特性
+# 二十.Rust的面向对象特性
 
 ## 面向对象语言的特点
 
@@ -10479,7 +10456,7 @@ fn main() {
 
 [https://kaisery.github.io/trpl-zh-cn/ch17-03-oo-design-patterns.html#%E9%9D%A2%E5%90%91%E5%AF%B9%E8%B1%A1%E8%AE%BE%E8%AE%A1%E6%A8%A1%E5%BC%8F%E7%9A%84%E5%AE%9E%E7%8E%B0](https://kaisery.github.io/trpl-zh-cn/ch17-03-oo-design-patterns.html#面向对象设计模式的实现)
 
-# 二十二.模式与模式匹配
+# 二十一.模式与模式匹配
 
 **模式：**
 
@@ -11083,7 +11060,7 @@ fn main() {
 }
 ```
 
-# 二十三.unsafe Rust
+# 二十二.unsafe Rust
 
 - 隐藏着第二个语言，它没有强制内存安全保证：unsafe Rust(不安全的Rust)
 
@@ -11358,7 +11335,7 @@ Sync 和 Send 标记 trait，编译器会自动为完全由 Send 和 Sync 类型
 
 使用 unsafe 来进行这五个操作（超能力）之一是没有问题的，甚至是不需要深思熟虑的，不过使得 unsafe 代码正确也实属不易，因为编译器不能帮助保证内存安全。当有理由使用 unsafe 代码时，是可以这么做的，通过使用显式的 unsafe 标注可以更容易地在错误发生时追踪问题的源头。
 
-# 二十四.高级trait
+# 二十三.高级trait
 
 ## 在trait定义中使用关联类型来指定占位类型
 
@@ -11745,7 +11722,7 @@ fn main(){
 }
 ```
 
-# 二十五.高级类型
+# 二十四.高级类型
 
 ## 使用newtype模式实现类型安全和抽象
 
@@ -11920,7 +11897,7 @@ fn generic<T: ?Sized>(t:&T){
 - T可能是也可能不是Sized
 - 这个语法只能用在Sized上面，不能被用于其它trait
 
-# 二十六.高级函数和闭包
+# 二十五.高级函数和闭包
 
 ## 函数指针
 
@@ -11999,11 +11976,11 @@ fn main(){
 }
 ```
 
-# 二十七.宏
+# 二十六.宏
 
 [https://kaisery.github.io/trpl-zh-cn/ch19-06-macros.html#%E5%AE%8F](https://kaisery.github.io/trpl-zh-cn/ch19-06-macros.html#宏)
 
-# 二十八.格式化输出
+# 二十七.格式化输出
 
 ## 位置参数
 
